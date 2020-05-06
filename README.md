@@ -1,1 +1,1 @@
-# Machine-Learning-Experiment-on-8-bit-Arduino
+# Machine Learning Experiment on 8-bit Arduino
