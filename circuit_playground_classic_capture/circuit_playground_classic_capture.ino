@@ -4,7 +4,7 @@
 #define LIS3DH_REG_WHOAMI        0x0F
 Simple_LIS3DH lis = Simple_LIS3DH(8);
 
-const int numSamples = 100;
+const int numSamples = 50;
 
 int samplesRead = numSamples;
 
@@ -55,7 +55,7 @@ void loop() {
       // add an empty line if it's the last sample
       Serial.println();
     }
-    delay(10);
+    delay(20);
   }
 
 }
