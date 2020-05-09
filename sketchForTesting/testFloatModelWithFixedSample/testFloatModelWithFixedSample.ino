@@ -9,11 +9,10 @@ void setup() {
   delay(1000);
   Serial.println("Start");
 
-
   loadData(inputFloatData);
 
 
-    processNN();
+  processNN();
 }
 
 void loop() {
