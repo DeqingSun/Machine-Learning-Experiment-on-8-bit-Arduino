@@ -40,10 +40,10 @@ void processNN(int8_t *dataPtr) {
     const PROGMEM int8_t *layerWeightArray = (const PROGMEM int8_t *)pgm_read_word(&(layerWeightArrays[layerIndex]));
     const PROGMEM int8_t *layerBaisArray = (const PROGMEM int8_t *)pgm_read_word(&(layerBaisArrays[layerIndex]));
 
-    //The datatype can be smaller, here I just follow the TFlite lib
-    int32_t inputZeroPoint = pgm_read_dword(&inputZeroPoints[layerIndex]);
-    int32_t weightZeroPoint = pgm_read_dword(&weightZeroPoints[layerIndex]);
-    int32_t outputZeroPoint = pgm_read_dword(&outputZeroPoints[layerIndex]);
+    //The datatype is smaller than test sketch
+    int8_t inputZeroPoint = pgm_read_byte(&inputZeroPoints[layerIndex]);
+    int8_t weightZeroPoint = pgm_read_byte(&weightZeroPoints[layerIndex]);
+    int8_t outputZeroPoint = pgm_read_byte(&outputZeroPoints[layerIndex]);
     int32_t reduced_multiplier = pgm_read_dword(&reduced_multipliers[layerIndex]);
     uint8_t total_shift = pgm_read_byte(&total_shifts[layerIndex]);
 
@@ -51,7 +51,7 @@ void processNN(int8_t *dataPtr) {
     for (uint16_t neuronIndex = 0; neuronIndex < bufferOutSize; neuronIndex++) {
       int32_t s = 0;
       for (uint16_t i = 0; i < bufferInSize; i++) {
-        s += (bufferIn[i] - inputZeroPoint) * ((int8_t)pgm_read_byte(&layerWeightArray[weightCounter]) - weightZeroPoint);
+        s += (int16_t)(bufferIn[i] - inputZeroPoint) * ((int8_t)pgm_read_byte(&layerWeightArray[weightCounter]) - weightZeroPoint);
         weightCounter += 1;
         
       }

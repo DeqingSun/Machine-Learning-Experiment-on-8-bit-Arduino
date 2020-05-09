@@ -22,8 +22,8 @@ const int8_t layerBaisArray1[] PROGMEM = { 17, -8, 0, 2, 2 };
 const int8_t layerBaisArray2[] PROGMEM = { 6, -6 };
 const int8_t *const layerBaisArrays[] PROGMEM = {layerBaisArray0, layerBaisArray1, layerBaisArray2};
 
-const int32_t inputZeroPoints[] PROGMEM = { -1, -128, -128 };
-const int32_t weightZeroPoints[] PROGMEM = { 0, 0, 0 };
-const int32_t outputZeroPoints[] PROGMEM = { -128, -128, -88 };
+const int8_t inputZeroPoints[] PROGMEM = { -1, -128, -128 };
+const int8_t weightZeroPoints[] PROGMEM = { 0, 0, 0 };
+const int8_t outputZeroPoints[] PROGMEM = { -128, -128, -88 };
 const int32_t reduced_multipliers[] PROGMEM = { 28469, 16975, 17882 };
 const uint8_t total_shifts[] PROGMEM = { 23, 22, 22 };
