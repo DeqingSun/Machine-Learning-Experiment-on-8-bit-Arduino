@@ -39,7 +39,42 @@ The last step is to port the python code we just wrote to Arduino code, with all
 
 ## Run a quantized model for faster speed
 
-The float model is simple to build and run, but slow. If higher speed is desired, we can use TFLiteConverter to convert a float Keras model into an 8-bit integer TFLite model. And Arduino can run it much faster.
+The float model is simple to build and run, but slow. If higher speed is desired, we can use TFLiteConverter to convert a float Keras model into an 8-bit integer TFLite model (cell 16). And Arduino can run it much faster.
+
+However, Tensorflow Lite is not as friendly as Keras. You can load a model, you can check each layer(tensor), you can set input and invoke the interpreter, you can get the parameter of each layer. However, the layer is shuffled and there is no API telling you how tensor flows. 
+
+Here I used a tool called [Netron](https://github.com/lutzroeder/netron) to view the structure of the model. Also, Netron can tell us the name and parameters of each tensor, so we can use the name we get from Netron to grab parameters from Tensorflow interpreter.
+
+![simple network](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/netronViewQuantize.png) 
+
+Here we can see the structure of the TFlite file. The input is quantized first, and then it is calculated through 3 fully connected layers, one softmax activation function, and finally dequantized. On Arduino, we just want to compare which of the 2 output is larger, so we skip the softmax and dequantize process. 
+
+Netron tells us the input of the quantizing process is tensor ```dense_input ``` and output is tensor ```dense_input_int8 ```. There are some quantization parameters, we can get the parameters in TensorFlow with ```interpreter.get_tensor_details()```. A part of the output is:
+
+```
+{'dtype': numpy.int8,
+  'index': 0,
+  'name': 'dense_input_int8',
+  'quantization': (0.9960784316062927, -1),
+  'quantization_parameters': {'quantized_dimension': 0,
+   'scales': array([0.99607843], dtype=float32),
+   'zero_points': array([-1], dtype=int32)},
+  'shape': array([  1, 150], dtype=int32),
+  'shape_signature': array([  1, 150], dtype=int32),
+  'sparsity_parameters': {}}
+```
+
+The quantizing process is mapping float numbers into an int8 type to accelerate data access and computation. This is a linear process and we can reverse the process after all computations to get float numbers again. There will be some accurate loss but doesn't matter much.
+
+![quantize map](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/quantize.png) 
+
+The above image shows some general concepts of the quantizing process. We are not going to map the entire float number range. Instead, we are mapping a certain range, from rmin to rmax. The range is decided by Tensorflow lite, all we need to do is conversion.
+
+![r=\frac{r_{max}-r_{min}}{(2^8-1)-0}\times(q-z)=S\times(q-z)](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/quantizeFunc1.gif)
+
+or
+
+![real\_value = scale \times ( int8\_value - zero\_point)](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/quantizeFunc2.gif) 
 
 TODO: How quantization works, how to calculate quantized values, how to get parameters from the TFLite model.
  
