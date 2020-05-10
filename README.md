@@ -64,6 +64,8 @@ Netron tells us the input of the quantizing process is tensor ```dense_input ```
   'sparsity_parameters': {}}
 ```
 
+### Quantization
+
 The quantizing process is mapping float numbers into an int8 type to accelerate data access and computation. This is a linear process and we can reverse the process after all computations to get float numbers again. There will be some accurate loss but doesn't matter much.
 
 ![quantize map](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/quantize.png) 
@@ -75,6 +77,77 @@ The above image shows some general concepts of the quantizing process. We are no
 or
 
 ![real\_value = scale \times ( int8\_value - zero\_point)](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/quantizeFunc2.gif) 
+
+In Arduino, this process does need float calculation. And we need to constrain result into [-128,127] range to prevent overflow. If the scale value is close to 1.0 and the zero point is close to 0.0, we can also skip this step.
+
+### Fully Connected
+
+Let's take a look at how FullyConnected layer works in Netron:
+
+![fully connected layer](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/netronViewQuantize2.png) 
+
+So we can see the FullyConnected layer involves 4 tensors: the input ```dense_input_int8```, the weights ```sequential/dense/MatMul```, the bais ```sequential/dense/BiasAdd/ReadVariableOp``` and the output ```sequential/dense/Relu```. Their details are:
+
+```
+{'dtype': numpy.int8,
+  'index': 0,
+  'name': 'dense_input_int8',
+  'quantization': (0.9960784316062927, -1),
+  'quantization_parameters': {'quantized_dimension': 0,
+   'scales': array([0.99607843], dtype=float32),
+   'zero_points': array([-1], dtype=int32)},
+  'shape': array([  1, 150], dtype=int32),
+  'shape_signature': array([  1, 150], dtype=int32),
+  'sparsity_parameters': {}},
+ {'dtype': numpy.int32,
+  'index': 1,
+  'name': 'sequential/dense/BiasAdd/ReadVariableOp',
+  'quantization': (0.0040348549373447895, 0),
+  'quantization_parameters': {'quantized_dimension': 0,
+   'scales': array([0.00403485], dtype=float32),
+   'zero_points': array([0], dtype=int32)},
+  'shape': array([10], dtype=int32),
+  'shape_signature': array([10], dtype=int32),
+  'sparsity_parameters': {}},
+ {'dtype': numpy.int8,
+  'index': 4,
+  'name': 'sequential/dense/MatMul',
+  'quantization': (0.004050740040838718, 0),
+  'quantization_parameters': {'quantized_dimension': 0,
+   'scales': array([0.00405074], dtype=float32),
+   'zero_points': array([0], dtype=int32)},
+  'shape': array([ 10, 150], dtype=int32),
+  'shape_signature': array([ 10, 150], dtype=int32),
+  'sparsity_parameters': {}},
+ {'dtype': numpy.int8,
+  'index': 7,
+  'name': 'sequential/dense/Relu',
+  'quantization': (1.188883662223816, -128),
+  'quantization_parameters': {'quantized_dimension': 0,
+   'scales': array([1.1888837], dtype=float32),
+   'zero_points': array([-128], dtype=int32)},
+  'shape': array([ 1, 10], dtype=int32),
+  'shape_signature': array([ 1, 10], dtype=int32),
+  'sparsity_parameters': {}}
+```
+
+We can see each tensor has it's own scale and zero point to represent real values. 
+
+For a fully connected layer, each neuron still calculates the value in the same way. 
+
+![Output_{real} = Input_{real0}*Weight_{real0} + Input_{real1}*Weight_{real1} + ... + Input_{realN}*Weight_{realN} + Bias_{real}](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc1.gif)
+
+or
+
+![O_{r} = I_{r0}*W_{r0} + I_{r1}*W_{r1} + ... + I_{rN}*W_{rN} + B_{r}
+](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc2.gif)
+
+We want the real values, but we only have quantized values now. If we replace every real value with the quantization equation, we get:
+
+![s_{o}(Q_{o}-z_{o}) =s_{i}(Q_{i0}-z_{i})*s_{w}(Q_{w0}-z_{w}) + s_{i}(Q_{i1}-z_{i})*s_{w}(Q_{w1}-z_{w}) + ... + s_{i}(Q_{iN}-z_{i})*s_{w}(Q_{wN}-z_{w}) + s_{b}(Q_{b}-z_{b}) \newline = s_is_w((Q_{i0}-z_{i})(Q_{w0}-z_{w})+(Q_{i1}-z_{i})(Q_{w1}-z_{w})+...+(Q_{iN}-z_{i})(Q_{wN}-z_{w}))+s_{b}(Q_{b}-z_{b}) \newline = s_is_w\sum_{n=0}^{N}(Q_{in}-z_{i})(Q_{wn}-z_{w})+s_{b}(Q_{b}-z_{b})](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc3.gif)
+
+I don't like the Sigma symbol but it does make the equation shorter. 
+
 
 TODO: How quantization works, how to calculate quantized values, how to get parameters from the TFLite model.
  
