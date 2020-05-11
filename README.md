@@ -39,7 +39,7 @@ The last step is to port the python code we just wrote to Arduino code, with all
 
 ## Run a quantized model for faster speed
 
-The float model is simple to build and run, but slow. If higher speed is desired, we can use TFLiteConverter to convert a float Keras model into an 8-bit integer TFLite model (cell 16). And Arduino can run it much faster.
+The float model is simple to build and run, but slow. If higher speed is desired, we can use TFLiteConverter to convert a float Keras model into an 8-bit integer TFLite model (cell 16). And Arduino can run it much faster. The algorithm mentioned below is ported from the Tensorflow Lite library.
 
 However, Tensorflow Lite is not as friendly as Keras. You can load a model, you can check each layer(tensor), you can set input and invoke the interpreter, you can get the parameter of each layer. However, the layer is shuffled and there is no API telling you how tensor flows. 
 
@@ -146,10 +146,32 @@ We want the real values, but we only have quantized values now. If we replace ev
 
 ![s_{o}(Q_{o}-z_{o}) =s_{i}(Q_{i0}-z_{i})*s_{w}(Q_{w0}-z_{w}) + s_{i}(Q_{i1}-z_{i})*s_{w}(Q_{w1}-z_{w}) + ... + s_{i}(Q_{iN}-z_{i})*s_{w}(Q_{wN}-z_{w}) + s_{b}(Q_{b}-z_{b}) \newline = s_is_w((Q_{i0}-z_{i})(Q_{w0}-z_{w})+(Q_{i1}-z_{i})(Q_{w1}-z_{w})+...+(Q_{iN}-z_{i})(Q_{wN}-z_{w}))+s_{b}(Q_{b}-z_{b}) \newline = s_is_w\sum_{n=0}^{N}(Q_{in}-z_{i})(Q_{wn}-z_{w})+s_{b}(Q_{b}-z_{b})](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc3.gif)
 
-I don't like the Sigma symbol but it does make the equation shorter. 
+I don't quite like the Sigma symbol but it does make the equation shorter. 
+
+Referring to ```GetQuantizedConvolutionMultipler``` function in ```kernel_util.cc```, it mentioned *"input_product_scale & bias_scale the same. ... guaranteed by the training pipeline"*. Also, the zero point of bias tensor seems always be zero.
+
+In Tensorflow Lite, the scale of weight tensor is the same as the scale of bias tensor, and the zero point of bias tensor is always zero. 
+
+![s_{b}=s_is_w](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc4.gif)
+
+So we can simplify the equation to:
+
+![s_{o}(Q_{o}-z_{o}) = s_is_w\sum_{n=0}^{N}(Q_{in}-z_{i})(Q_{wn}-z_{w})+s_is_w(Q_{b}-z_{b})
+ \newline = s_is_w(\sum_{n=0}^{N}(Q_{in}-z_{i})(Q_{wn}-z_{w})+(Q_{b}-z_{b}))](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc5.gif)
+
+In a quantized calculation, we need to get Qo as the quantized value of a neuron.
+
+![Q_{o}= \frac{s_is_w}{s_{o}}(\sum_{n=0}^{N}(Q_{in}-z_{i})(Q_{wn}-z_{w})+(Q_{b}-z_{b}))+z_{o}](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc6.gif)
+
+Everything is quite straight forward in integer calculation, except for the ```si*sw/so``` part. That is called a "QuantizedConvolutionMultipler" in the Tensorflow Lite code. For any layer in any given model, these scale numbers are constants. So we can convert this float calculation into multiply and shift operations for faster speed. In Tensorflow Lite, the interpreter does the conversion in the preparation stage. And we can do it in python, then export multiplier and shift values for Arduino to use.
+
+![\frac{s_is_w}{s_{o}}=m\times2^n=\frac{m\times2^{15}}{2^{15-n}}=(m\times2^{15})>>(15-n)
+](https://raw.githubusercontent.com/DeqingSun/Machine-Learning-Experiment-on-8-bit-Arduino/master/images/fullyconnectFunc7.gif)
+
+We can use ```frexp``` function to convert a float number into a normalized fraction (mantissa * 2 ^ exponent). Just make sure ```m``` is larger or equal to 1/2 and less than 1, then ```m*2^15``` will be less or equal to 32767, which fits into an int16 type variable. That's how we use integer multiplication and shift to replace a float multiplication.
 
 
-TODO: How quantization works, how to calculate quantized values, how to get parameters from the TFLite model.
+
  
 
 
